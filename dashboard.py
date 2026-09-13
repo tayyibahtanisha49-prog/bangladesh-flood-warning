@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import altair as alt
-import plotly.express as px
 import requests
 from google import genai
 from pydantic import BaseModel, Field
@@ -11,75 +10,83 @@ import json
 from datetime import datetime
 
 # ==========================================
-# 1. PAGE CORE & Google Material UI Styling
+# 1. PAGE CONFIG & GOOGLE DESIGN SYSTEM
 # ==========================================
 st.set_page_config(
-    page_title="Operational Flood Insight • Surma Basin",
+    page_title="Surma River Basin | Operational Flood Command",
     page_icon="🌊",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for Material Design aesthetics and layout spacing
+# Custom Glassmorphism & Material 3 Styling Injection
 st.markdown("""
     <style>
-        /* Google Fonts Integration */
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Google+Sans:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
 
         html, body, [class*="css"] {
-            font-family: 'Roboto', sans-serif;
-        }
-        
-        h1, h2, h3, h4, .stMetric {
             font-family: 'Google Sans', sans-serif;
         }
-
-        /* Material UI Dark Theme overrides */
+        
         .stApp {
-            background-color: #121212;
-            color: #E0E0E0;
+            background-color: #060911;
+            background-image: radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.05) 0px, transparent 50%),
+                              radial-gradient(at 100% 100%, rgba(239, 68, 68, 0.05) 0px, transparent 50%);
+            color: #f1f5f9;
         }
 
-        /* Structured Metric Card */
-        [data-testid="stMetricValue"] {
-            font-size: 2.8rem;
-            font-weight: 500;
-            color: #8AB4F8; /* Google Blue */
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 1rem;
-            color: #9AA0A6;
-        }
-        
-        /* Analysis Containers (Cards) */
-        .analysis-card {
-            background-color: #1E1E1E;
-            border-radius: 8px;
+        /* Glassmorphism Cards */
+        .glass-card {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
             padding: 24px;
-            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
-            margin-bottom: 16px;
-            border: 1px solid #333;
-        }
-        
-        /* Section Subheaders */
-        .section-header {
-            color: #E8EAED;
-            font-weight: 500;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
             margin-bottom: 20px;
-            font-size: 1.2rem;
-            letter-spacing: 0.5px;
+        }
+
+        /* Metric Typography Override */
+        [data-testid="stMetricValue"] {
+            font-family: 'Google Sans', sans-serif;
+            font-size: 2.5rem !important;
+            font-weight: 700 !important;
+            color: #38bdf8 !important;
         }
         
-        /* Alert Status Pill */
-        .status-pill {
+        [data-testid="stMetricLabel"] {
+            font-size: 0.85rem !important;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8 !important;
+        }
+
+        /* Status Badges */
+        .status-badge-critical {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
             padding: 6px 16px;
-            border-radius: 100px;
-            font-weight: 500;
-            font-size: 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
             display: inline-block;
         }
 
-        /* Main structure spacing */
+        .status-badge-normal {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid #22c55e;
+            color: #86efac;
+            padding: 6px 16px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            display: inline-block;
+        }
+
         .block-container {
             padding-top: 2rem;
             padding-bottom: 2rem;
@@ -88,263 +95,191 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. APPLICATION HEADER (Google Minimalist)
+# 2. BRANDED COMMAND HEADER
 # ==========================================
-h_col1, h_col2 = st.columns([4, 1])
+header_col1, header_col2 = st.columns([3, 1])
 
-with h_col1:
-    st.markdown('<div style="display:flex; align-items:center;">', unsafe_allow_html=True)
-    st.image("https://www.gstatic.com/images/branding/product/2x/disaster_relief_flood_56dp.png", width=48) # Flood specific icon
+with header_col1:
     st.markdown("""
-        <div style="margin-left: 16px;">
-            <h1 style="margin:0; font-size: 2.2rem; font-weight: 400; color: #E8EAED;">Surma Basin Flood Analyst</h1>
-            <p style="margin: 0; color: #9AA0A6; font-size: 1rem;">Sunamganj Operational Centre | Active Monitoring 🟢</p>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="background: linear-gradient(135deg, #0284c7, #2563eb); padding: 12px; border-radius: 12px;">
+                <span style="font-size: 28px;">🌊</span>
+            </div>
+            <div>
+                <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700; color: #f8fafc;">Surma Basin Operational Warning Center</h1>
+                <p style="margin: 2px 0 0 0; color: #64748b; font-size: 0.9rem;">
+                    Sunamganj Hydrological Station (25.0686° N, 91.4004° E) | Open-Meteo & Gemini Flash Pipeline
+                </p>
+            </div>
         </div>
     """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
-with h_col2:
+with header_col2:
     st.markdown(f"""
-        <div style="text-align: right; color: #9AA0A6;">
-            <p style="margin:0; font-size:0.9rem;">Last Synced (UTC)</p>
-            <p style="margin:0; font-weight:500; color:#E8EAED; font-size:1.1rem;">{datetime.utcnow().strftime('%H:%M:%S')}</p>
+        <div style="text-align: right; background: rgba(15, 23, 42, 0.4); padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase;">System Latency</div>
+            <div style="font-family: 'Roboto Mono', monospace; font-size: 1.1rem; color: #38bdf8; font-weight: 500;">
+                LIVE TELEMETRY
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
 st.divider()
 
 # ==========================================
-# 3. GLOBAL TELEMETRY (Structured Data Fetch)
+# 3. TELEMETRY PIPELINE & DATA PROCESSING
 # ==========================================
-# Define Station Metadata
-stations = {
-    "Sunamganj": {"lat": 25.0686, "lon": 91.4004, "basins": "Surma", "id": "SN001"},
-}
-selected_station_name = "Sunamganj"
-station_data = stations[selected_station_name]
-
-# Define critical discharge threshold
-THRESHOLD_CRITICAL = 500.0  # m3/s
+LAT, LON = 25.0686, 91.4004
+CRITICAL_THRESHOLD = 500.0  # m3/s
 
 @st.cache_data(ttl=300)
-def fetch_telemetry(lat, lon):
-    url = f"https://flood-api.open-meteo.com/v1/flood?latitude={lat}&longitude={lon}&daily=river_discharge&forecast_days=7&timezone=UTC"
+def load_telemetry_data():
+    url = f"https://flood-api.open-meteo.com/v1/flood?latitude={LAT}&longitude={LON}&daily=river_discharge&forecast_days=7"
     try:
         res = requests.get(url, timeout=10).json()
         daily = res.get("daily", {})
         df = pd.DataFrame({
             "Timestamp": pd.to_datetime(daily.get("time", [])),
-            "Discharge (m³/s)": daily.get("river_discharge", [])
+            "Discharge": daily.get("river_discharge", [])
         })
-        
-        # Calculate derived features
-        df['Forecast_Day'] = df['Timestamp'].dt.strftime('%a, %b %d')
-        df['Below_Threshold'] = df['Discharge (m³/s)'] < THRESHOLD_CRITICAL
-        
+        df['Date_Label'] = df['Timestamp'].dt.strftime('%b %d')
         return df
-    except Exception as e:
-        st.error(f"Error connecting to Open-Meteo API. Check connectivity.")
+    except Exception:
         return pd.DataFrame()
 
-# Initialize primary data
-df_telemetry = fetch_telemetry(station_data['lat'], station_data['lon'])
+df_telemetry = load_telemetry_data()
 
 # ==========================================
-# 4. PRIMARY INTELLIGENCE: Executive Summary & KPIs
+# 4. EXECUTIVE SUMMARY (METRIC ROW)
 # ==========================================
-with st.container():
-    if not df_telemetry.empty:
-        # Calculate derived analysis
-        peak_discharge_m3 = df_telemetry["Discharge (m³/s)"].max()
-        current_discharge_m3 = df_telemetry["Discharge (m³/s)"].iloc[0]
-        critical_risk_flag = peak_discharge_m3 > THRESHOLD_CRITICAL
-        
-        # Structure KPI Row
-        st.markdown('<p class="section-header">Executive Summary</p>', unsafe_allow_html=True)
-        kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1, 1, 1, 1.5])
-        
-        with kpi_col1:
-            st.metric("Current Streamflow", f"{current_discharge_m3:.1f}", help="Latest available telemetry.")
-        
-        with kpi_col2:
-            st.metric("Forecasted Peak Discharge", f"{peak_discharge_m3:.1f}", help="Maximum discharge predicted in the next 7 days.")
-        
-        with kpi_col3:
-            st.metric("Critical Action Threshold", f"{THRESHOLD_CRITICAL:.0f}", help="Discharge rate indicating major operational risk.")
+if not df_telemetry.empty:
+    current_flow = df_telemetry["Discharge"].iloc[0]
+    peak_flow = df_telemetry["Discharge"].max()
+    is_critical = peak_flow > CRITICAL_THRESHOLD
 
-        with kpi_col4:
-            # Dynamic Status Pill
-            status_text = "CRITICAL RISK ACTIVE" if critical_risk_flag else "NOMINAL MONITORING"
-            status_color = "#EA4335" if critical_risk_flag else "#34A853" # Google Red / Green
-            text_color = "white"
-            
-            st.markdown(f"""
-                <div style="text-align: right; padding-top: 10px;">
-                    <span class="status-pill" style="background-color: {status_color}; color: {text_color};">
-                        {status_text}
-                    </span>
-                    <p style="margin: 8px 0 0 0; color: #9AA0A6; font-size: 0.9rem;">
-                        Analysing telemetry for Basin ID: {station_data['basins']}
-                    </p>
-                </div>
-            """, unsafe_allow_html=True)
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Real-Time Flow", f"{current_flow:.1f} m³/s")
+    with m2:
+        st.metric("7-Day Forecast Peak", f"{peak_flow:.1f} m³/s")
+    with m3:
+        st.metric("Danger Threshold", f"{CRITICAL_THRESHOLD:.0f} m³/s")
+    with m4:
+        badge_html = f'<span class="status-badge-critical">🚨 CRITICAL RISK</span>' if is_critical else f'<span class="status-badge-normal">🟢 NOMINAL</span>'
+        st.markdown(f"""
+            <div style="padding-top: 8px;">
+                <div style="font-size: 0.85rem; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Operational State</div>
+                {badge_html}
+            </div>
+        """, unsafe_allow_html=True)
 
 st.divider()
 
 # ==========================================
-# 5. SPATIAL & TEMPORAL ANALYSIS CONTAINER
+# 5. ASYMMETRIC ANALYTICS GRID
 # ==========================================
-ana_col_map, ana_col_chart = st.columns([1.5, 2.5], gap="large")
+grid_left, grid_right = st.columns([1.7, 1.3], gap="large")
 
-# -- 5.1 Professional Geospatial Context --
-with ana_col_map:
-    st.markdown('<p class="section-header">Station Location & Spatial Risk</p>', unsafe_allow_html=True)
+with grid_left:
+    st.subheader("📊 Streamflow Dynamics & Geospatial Context")
     
-    # Map Styling (Google-like Dark Grey)
-    view_state = pdk.ViewState(
-        latitude=station_data['lat'],
-        longitude=station_data['lon'],
-        zoom=11,
-        pitch=0
-    )
-    
-    # Dynamic point coloring
-    map_color = [234, 67, 53, 200] if critical_risk_flag else [52, 168, 83, 200] # Red or Green
+    # 5.1 Altair Gradient Hydrograph
+    if not df_telemetry.empty:
+        chart = alt.Chart(df_telemetry).mark_area(
+            line={'color': '#38bdf8', 'size': 2},
+            color=alt.Gradient(
+                gradient='linear',
+                stops=[alt.GradientStop(color='rgba(56, 189, 248, 0.0)', offset=0),
+                       alt.GradientStop(color='rgba(56, 189, 248, 0.35)', offset=1)],
+                x1=1, x2=1, y1=1, y2=0
+            )
+        ).encode(
+            x=alt.X('Date_Label:O', title='Forecast Date', axis=alt.Axis(labelAngle=0, labelColor='#94a3b8')),
+            y=alt.Y('Discharge:Q', title='Discharge (m³/s)', axis=alt.Axis(labelColor='#94a3b8')),
+            tooltip=['Date_Label', alt.Tooltip('Discharge', format='.1f')]
+        ).properties(height=240)
 
-    gauge_layer = pdk.Layer(
+        # Danger Threshold Overlay Line
+        threshold_line = alt.Chart(pd.DataFrame({'y': [CRITICAL_THRESHOLD]})).mark_rule(
+            color='#ef4444',
+            strokeDash=[4, 4],
+            size=1.5
+        ).encode(y='y:Q')
+
+        st.altair_chart(chart + threshold_line, use_container_width=True)
+
+    # 5.2 PyDeck Dark Vector Map
+    map_df = pd.DataFrame([{"lat": LAT, "lon": LON, "name": "Sunamganj Station"}])
+    view_state = pdk.ViewState(latitude=LAT, longitude=LON, zoom=10, pitch=45)
+    
+    layer = pdk.Layer(
         "ScatterplotLayer",
-        pd.DataFrame([station_data]),
+        map_df,
         get_position=["lon", "lat"],
-        get_radius=1000,
-        get_color=map_color,
-        pickable=True,
+        get_color=[239, 68, 68, 220] if is_critical else [34, 197, 94, 220],
+        get_radius=2500,
+        pickable=True
     )
     
     st.pydeck_chart(pdk.Deck(
-        map_style="mapbox://styles/mapbox/dark-v10", # Clean professional basemap
+        layers=[layer],
         initial_view_state=view_state,
-        layers=[gauge_layer],
-        tooltip={"text": "Sunamganj Gauge\nLat: {lat}\nLon: {lon}"}
-    ))
+        map_style="mapbox://styles/mapbox/dark-v10"
+    ), height=240)
 
-# -- 5.2 Advanced Temporal Forecast (Altair Chart) --
-with ana_col_chart:
-    st.markdown('<p class="section-header">7-Day Hydrological Forecast</p>', unsafe_allow_html=True)
+with grid_right:
+    st.subheader("🚨 Gemini Operational Incident Dispatch")
     
-    if not df_telemetry.empty:
-        # Define Altair Chart for professional data viz
-        chart = alt.Chart(df_telemetry).mark_area(
-            line={'color':'#8AB4F8'},
-            color=alt.Gradient(
-                gradient='linear',
-                stops=[alt.GradientStop(color='#202124', offset=0),
-                       alt.GradientStop(color='#8AB4F8', offset=1)],
-                x1=1, x2=1, y1=1, y2=0
-            ),
-            opacity=0.3
-        ).encode(
-            x=alt.X('Forecast_Day:O', title='Date (UTC)'),
-            y=alt.Y('Discharge (m³/s):Q', title='River Discharge (m³/s)'),
-            tooltip=['Forecast_Day', alt.Tooltip('Discharge (m³/s)', format='.1f')]
-        ).properties(height=300)
+    # AI Output Schema Definition
+    class OperationalAdvisory(BaseModel):
+        risk_level: str = Field(description="LOW, MODERATE, HIGH, or CRITICAL")
+        advisory_bn: str = Field(description="Bengali executive summary for local response teams")
+        advisory_en: str = Field(description="English executive summary for agency coordination")
+        protocols: list[str] = Field(description="Actionable 1-2 sentence operational directives")
 
-        # Add Critical Threshold Line
-        rule = alt.Chart(pd.DataFrame({'y': [THRESHOLD_CRITICAL]})).mark_rule(
-            color='#EA4335',
-            strokeDash=[5, 5],
-            size=2
-        ).encode(y='y:Q')
-        
-        # Combine layers and display
-        st.altair_chart(chart + rule, use_container_width=True)
-
-st.divider()
-
-# ==========================================
-# 6. AI INCIDENT DISPATCH CONTAINER (Professional)
-# ==========================================
-st.markdown('<p class="section-header">🚨 Gemini Operations Briefing</p>', unsafe_allow_html=True)
-
-# Google AI Schema Definition
-class operationalBriefing(BaseModel):
-    risk_assessment: str = Field(description="High-level assessment: LOW, MODERATE, HIGH, EXTREME")
-    operational_impact_bn: str = Field(description="Analysis of local operational impact in Bengali")
-    operational_impact_en: str = Field(description="Analysis of local operational impact in English")
-    key_action_protocols: list[str] = Field(description="Structured emergency action protocols for response teams")
-
-# API Configuration
-api_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
-
-with st.container():
+    api_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
+    
     if api_key and not df_telemetry.empty:
         try:
             client = genai.Client(api_key=api_key)
-            prompt = f"Operational analysis of Surma river telemetry at Sunamganj. Current streamflow: {current_discharge_m3:.1f} m3/s, 7-day peak forecasted: {peak_discharge_m3:.1f} m3/s, critical threshold: {THRESHOLD_CRITICAL:.0f} m3/s. Provide structured response."
+            prompt = f"Analyze Surma River discharge: current {current_flow:.1f} m3/s, 7-day peak {peak_flow:.1f} m3/s, threshold {CRITICAL_THRESHOLD:.0f} m3/s. Formulate precise operational advisory."
             
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt,
                 config={
                     "response_mime_type": "application/json",
-                    "response_schema": operationalBriefing,
+                    "response_schema": OperationalAdvisory,
                 }
             )
             
-            # Process AI output
-            briefing = json.loads(response.text)
-            
-            ai_b_col1, ai_b_col2 = st.columns([1, 1.5], gap="large")
-            
-            # Left: Assessment & Bilingual Text
-            with ai_b_col1:
-                risk_level = briefing.get('risk_assessment')
-                risk_color = "#EA4335" if risk_level in ["HIGH", "EXTREME"] else "#FBBC04" if risk_level == "MODERATE" else "#34A853"
-                
-                # Risk Assessment Block
+            data = json.loads(response.text)
+            risk = data.get("risk_level", "UNKNOWN")
+            risk_color = "#ef4444" if risk in ["HIGH", "CRITICAL"] else "#38bdf8"
+
+            st.markdown(f"""
+                <div style="background: rgba(15, 23, 42, 0.8); border-left: 4px solid {risk_color}; padding: 18px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase;">Assessed Threat Level</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: {risk_color};">{risk}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            tab_bn, tab_en = st.tabs(["🇧🇩 বাংলা নির্দেশিকা", "🇬🇧 English Advisory"])
+            with tab_bn:
+                st.markdown(f"<p style='color: #cbd5e1; font-size: 0.95rem; line-height: 1.6;'>{data.get('advisory_bn')}</p>", unsafe_allow_html=True)
+            with tab_en:
+                st.markdown(f"<p style='color: #cbd5e1; font-size: 0.95rem; line-height: 1.6;'>{data.get('advisory_en')}</p>", unsafe_allow_html=True)
+
+            st.write("#### Response Directives")
+            for idx, action in enumerate(data.get("protocols", [])):
                 st.markdown(f"""
-                    <div style="background-color: #1E1E1E; padding: 20px; border-radius: 8px; border-left: 5px solid {risk_color}; margin-bottom: 20px;">
-                        <p style="margin:0; color: {risk_color}; font-weight: 500; font-size: 0.9rem;">Operations Risk Assessment</p>
-                        <h3 style="margin: 4px 0 0 0; color: #E8EAED; font-size: 1.8rem;">{risk_level}</h3>
+                    <div style="display: flex; align-items: flex-start; gap: 12px; background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <span style="color: #38bdf8; font-family: 'Roboto Mono', monospace; font-weight: 700;">0{idx+1}</span>
+                        <span style="color: #e2e8f0; font-size: 0.9rem;">{action}</span>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Bilingual Operational Impact Cards
-                tab_bn, tab_en = st.tabs(["বাংলা ব্রিফিং (BN)", "English Briefing (EN)"])
-                with tab_bn:
-                    st.markdown(f'<p style="color: #9AA0A6; line-height: 1.6;">{briefing.get("operational_impact_bn")}</p>', unsafe_allow_html=True)
-                with tab_en:
-                    st.markdown(f'<p style="color: #9AA0A6; line-height: 1.6;">{briefing.get("operational_impact_en")}</p>', unsafe_allow_html=True)
-
-            # Right: Action Protocols
-            with ai_b_col2:
-                st.markdown('<p style="color: #E8EAED; font-weight: 500; font-size: 1rem;">Action Protocols & Response Checklists</p>', unsafe_allow_html=True)
-                for i, protocol in enumerate(briefing.get("key_action_protocols", [])):
-                    # Material UI Checkbox aesthetic
-                    st.markdown(f"""
-                        <div style="display:flex; align-items:center; background-color: #252525; padding: 12px; border-radius: 4px; margin-bottom: 10px; border: 1px solid #333;">
-                            <div style="width: 20px; height: 20px; border: 2px solid #8AB4F8; border-radius: 2px; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: #8AB4F8; font-weight: 700;">{i+1}</div>
-                            <p style="margin:0; color: #E8EAED; font-size: 0.95rem;">{protocol}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
         except Exception as e:
-            st.error(f"Telemetry processed. Gemini AI Services temporarily unavailable.")
-    elif not api_key:
-        st.info("💡 A valid Gemini API Key is required in Streamlit Secrets (`GEMINI_API_KEY`) to enable the AI Incident Dispatch panel.")
+            st.warning("Telemetry active. AI Dispatch engine initializing...")
     else:
-        st.warning("Insufficient telemetry data to trigger Gemini AI briefing.")
-
-# ==========================================
-# 7. Operational Sidebar & Controls
-# ==========================================
-with st.sidebar:
-    st.markdown("""
-        <div style="display:flex; align-items:center; margin-bottom: 20px;">
-            <img src="https://www.gstatic.com/images/branding/product/2x/disaster_relief_flood_56dp.png" width="32">
-            <h2 style="margin-left: 12px; font-weight: 400; color: #E8EAED;">Monitor Settings</h2>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.divider()
-    st.caption(f"Connected to Station ID: {station_data['id']}")
-    st.caption(f"Coordinates: {station_data['lat']}°N, {station_data['lon']}°E")
+        st.info("Set GEMINI_API_KEY in Streamlit Secrets to activate live operational dispatch generation.")
