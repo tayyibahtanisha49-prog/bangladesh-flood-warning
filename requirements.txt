@@ -1,7 +1,9 @@
-﻿streamlit
-requests
+streamlit
 pandas
-pydeck
 google-genai
-python-dotenv
+requests
+pydeck
+matplotlib
 pydantic
+altair
+plotly
